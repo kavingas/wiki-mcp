@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "confluence": {
+      "command": "uv",
+      "args": ["run", "python", "/ABSOLUTE/PATH/TO/confluce-mcp/main.py"],
+      "env": {
+        "CONFLUENCE_BASE_URL": "https://wiki.corp.adobe.com",
+        "CONFLUENCE_API_TOKEN": "your-api-token"
+      }
+    }
+  }
+}
