@@ -130,7 +130,7 @@ wheels = [
 ]
 
 [[package]]
-name = "confluce-mcp"
+name = "wiki-mcp"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [

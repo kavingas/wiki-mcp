@@ -1,4 +1,4 @@
-# Confluence MCP
+# Wiki MCP
 
 MCP server that creates Confluence articles via the Confluence REST API v1 (e.g. wiki.corp.adobe.com). Based on `create-confluence-article.js`.
 
@@ -38,9 +38,9 @@ Add to **Cursor Settings → MCP** or to `~/.cursor/mcp.json`:
 ```json
 {
   "mcpServers": {
-    "confluence": {
+    "wiki": {
       "command": "uv",
-      "args": ["run", "python", "/Users/kavingas/VSCodeProjects/confluce-mcp/main.py"],
+      "args": ["run", "python", "/Users/kavingas/VSCodeProjects/wiki-mcp/main.py"],
       "env": {
         "CONFLUENCE_BASE_URL": "https://wiki.corp.adobe.com",
         "CONFLUENCE_API_TOKEN": "<your-token>"

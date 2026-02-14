@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Confluence MCP server: create and manage Confluence pages via Confluence REST API v1.
+Wiki MCP server: create and manage Confluence pages via Confluence REST API v1.
 
 Environment (or .env):
   CONFLUENCE_BASE_URL   Base URL (default: https://wiki.corp.adobe.com)
@@ -11,12 +11,12 @@ Environment (or .env):
 from dotenv import load_dotenv
 from mcp.server.fastmcp import FastMCP
 
-from confluence_tools import tools
+from wiki_tools import tools
 
 load_dotenv(override=True)
 
 # Initialize FastMCP server
-mcp = FastMCP("confluence-mcp")
+mcp = FastMCP("wiki-mcp")
 
 
 def main() -> None:
