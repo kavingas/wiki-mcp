@@ -14,14 +14,16 @@ _API_TOKEN = os.environ.get("CONFLUENCE_API_TOKEN", "")
 
 
 def _get_body_from_wiki_file(body_file: str) -> str:
-    """Read Confluence wiki markup from a .wiki file."""
+    """Read Confluence wiki markup from a .wiki file. body_file must be an absolute path."""
     path = Path(body_file)
+    if not path.is_absolute():
+        raise ValueError(
+            "body_file must be an absolute path; got a relative path."
+        )
     if not path.suffix.lower() == ".wiki":
         raise ValueError(
             f"Only .wiki files are accepted; got: {path.suffix or path.name!r}"
         )
-    if not path.is_absolute():
-        path = Path.cwd() / path
     if not path.exists():
         raise FileNotFoundError(f"Wiki file not found: {path}")
     return path.read_text(encoding="utf-8")
@@ -41,9 +43,9 @@ async def create_confluence_article(
 ) -> str:
     """Create a Confluence page (article) via REST API v1.
 
-    Pass the path to a .wiki file containing Confluence wiki markup (not HTML, not Markdown).
+    Pass the absolute path to a .wiki file containing Confluence wiki markup (not HTML, not Markdown).
     Uses CONFLUENCE_BASE_URL and CONFLUENCE_API_TOKEN from environment.
-    Required: title, body_file (path to a .wiki file). Optional: parent_id, space_key.
+    Required: title, body_file (absolute path to a .wiki file). Optional: parent_id, space_key.
     """
     token = _API_TOKEN or os.environ.get("CONFLUENCE_API_TOKEN")
     if not token:
@@ -99,8 +101,8 @@ async def update_confluence_article(
     """Update an existing Confluence page via REST API v1.
 
     Fetches the current page to get version and metadata, then PUTs new body (and
-    optionally a new title). body_file must be a .wiki file with Confluence wiki markup.
-    Required: page_id, body_file. Optional: title (if omitted, keeps existing title).
+    optionally a new title). body_file must be the absolute path to a .wiki file with Confluence wiki markup.
+    Required: page_id, body_file (absolute path). Optional: title (if omitted, keeps existing title).
     """
     token = _API_TOKEN or os.environ.get("CONFLUENCE_API_TOKEN")
     if not token:
@@ -172,5 +174,56 @@ async def update_confluence_article(
     return msg
 
 
+async def get_confluence_page(page_id: str) -> str:
+    """Fetch a Confluence page by ID and return its content.
+
+    Returns the page title, view URL, version, and body content (storage format).
+    Uses CONFLUENCE_BASE_URL and CONFLUENCE_API_TOKEN from environment.
+    Required: page_id (Confluence page ID, e.g. "123456789").
+    """
+    token = _API_TOKEN or os.environ.get("CONFLUENCE_API_TOKEN")
+    if not token:
+        raise ValueError(
+            "CONFLUENCE_API_TOKEN is not set. Set it in the environment or in .env."
+        )
+
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        resp = await client.get(
+            f"{_BASE_URL}/rest/api/content/{page_id}",
+            params={"expand": "body.storage,version,space"},
+            headers={
+                "Accept": "application/json",
+                "Authorization": f"Bearer {token}",
+            },
+        )
+
+    text = resp.text
+    if not resp.is_success:
+        err_msg = f"Confluence GET {resp.status_code} {resp.reason_phrase}: {text}"
+        raise RuntimeError(err_msg)
+
+    page = json.loads(text) if text else {}
+    title = page.get("title", "")
+    view_url = _build_view_url(page) if page.get("id") else ""
+    version_num = (page.get("version") or {}).get("number", "?")
+    body_storage = (page.get("body") or {}).get("storage") or {}
+    content = body_storage.get("value", "")
+    representation = body_storage.get("representation", "storage")
+
+    lines = [
+        f"Title: {title}",
+        f"Page ID: {page.get('id', page_id)}",
+        f"Version: {version_num}",
+        f"Representation: {representation}",
+    ]
+    if view_url:
+        lines.append(f"View URL: {view_url}")
+    lines.append("")
+    lines.append("--- Content ---")
+    lines.append(content if content.strip() else "(empty)")
+
+    return "\n".join(lines)
+
+
 # List of tools to register with FastMCP (add_tool(tool) for each)
-tools = [create_confluence_article, update_confluence_article]
+tools = [create_confluence_article, update_confluence_article, get_confluence_page]

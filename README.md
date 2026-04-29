@@ -63,7 +63,7 @@ Creates a Confluence page from a **.wiki file** (Confluence wiki markup only; no
 | Argument     | Required | Description |
 |--------------|----------|-------------|
 | `title`      | Yes      | Page title |
-| `body_file`  | Yes      | Path to a **.wiki** file containing Confluence wiki markup |
+| `body_file`  | Yes      | **Absolute path** to a **.wiki** file containing Confluence wiki markup |
 | `space_key`  | No       | Space key (default: ~kavingas) |
 | `parent_id`  | No       | Parent page ID |
 
