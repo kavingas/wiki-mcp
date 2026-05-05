@@ -190,7 +190,7 @@ async def get_confluence_page(page_id: str) -> str:
     async with httpx.AsyncClient(timeout=30.0) as client:
         resp = await client.get(
             f"{_BASE_URL}/rest/api/content/{page_id}",
-            params={"expand": "body.wiki,version,space"},
+            params={"expand": "body.storage,version,space"},
             headers={
                 "Accept": "application/json",
                 "Authorization": f"Bearer {token}",
@@ -206,7 +206,7 @@ async def get_confluence_page(page_id: str) -> str:
     title = page.get("title", "")
     view_url = _build_view_url(page) if page.get("id") else ""
     version_num = (page.get("version") or {}).get("number", "?")
-    body_storage = (page.get("body") or {}).get("wiki") or {}
+    body_storage = (page.get("body") or {}).get("storage") or {}
     content = body_storage.get("value", "")
     representation = body_storage.get("representation", "storage")
 
