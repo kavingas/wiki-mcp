@@ -4,7 +4,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 ENV_FILE="$REPO_ROOT/.env"
 PYPROJECT="$REPO_ROOT/pyproject.toml"
-PYPI_URL="https://sauronai.adobe.io/pypi"
+PYPI_URL="https://sauronai.adobe.io/pypi/"
 
 if [[ ! -f "$ENV_FILE" ]]; then
   echo "Error: .env not found at $ENV_FILE" >&2

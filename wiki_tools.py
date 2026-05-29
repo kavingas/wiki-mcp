@@ -248,9 +248,6 @@ async def get_confluence_child_pages(page_id: str) -> str:
             results = data.get("results", [])
             children.extend(results)
 
-            size = data.get("size", 0)
-            if start + size >= data.get("_links", {}) and len(results) < limit:
-                break
             if len(results) < limit:
                 break
             start += limit
