@@ -43,7 +43,25 @@ async def create_confluence_article(
 ) -> str:
     """Create a Confluence page (article) via REST API v1.
 
-    Pass the absolute path to a .wiki file containing Confluence wiki markup (not HTML, not Markdown).
+    body_file must be an absolute path to a .wiki file written in Confluence wiki markup.
+    Do NOT use HTML or Markdown — only Confluence wiki markup is accepted.
+
+    Wiki markup syntax reference:
+      Headings:     h1. Title / h2. Title / h3. Title
+      Bold:         *bold*
+      Italic:       _italic_
+      Monospace:    {{inline code}}
+      Bullet list:  * item (nested: ** item)
+      Numbered:     # item (nested: ## item)
+      Table header: ||col1||col2||
+      Table row:    |cell1|cell2|
+      Link:         [text|url]
+      Code block:   {code:language}...{code}  (e.g. {code:bash}, {code:python})
+      Panel:        {panel:title=Title}...{panel}
+      Quote:        {quote}...{quote}
+      Hr:           ----
+      Note/Warning: {note}...{note} / {warning}...{warning}
+
     Uses CONFLUENCE_BASE_URL and CONFLUENCE_API_TOKEN from environment.
     Required: title, body_file (absolute path to a .wiki file). Optional: parent_id, space_key.
     """
@@ -60,7 +78,7 @@ async def create_confluence_article(
         "title": title,
         "space": {"key": space_key},
         "body": {
-            "storage": {
+            "wiki": {
                 "value": body_value,
                 "representation": "wiki",
             }
@@ -101,7 +119,25 @@ async def update_confluence_article(
     """Update an existing Confluence page via REST API v1.
 
     Fetches the current page to get version and metadata, then PUTs new body (and
-    optionally a new title). body_file must be the absolute path to a .wiki file with Confluence wiki markup.
+    optionally a new title). body_file must be the absolute path to a .wiki file written
+    in Confluence wiki markup. Do NOT use HTML or Markdown — only Confluence wiki markup is accepted.
+
+    Wiki markup syntax reference:
+      Headings:     h1. Title / h2. Title / h3. Title
+      Bold:         *bold*
+      Italic:       _italic_
+      Monospace:    {{inline code}}
+      Bullet list:  * item (nested: ** item)
+      Numbered:     # item (nested: ## item)
+      Table header: ||col1||col2||
+      Table row:    |cell1|cell2|
+      Link:         [text|url]
+      Code block:   {code:language}...{code}  (e.g. {code:bash}, {code:python})
+      Panel:        {panel:title=Title}...{panel}
+      Quote:        {quote}...{quote}
+      Hr:           ----
+      Note/Warning: {note}...{note} / {warning}...{warning}
+
     Required: page_id, body_file (absolute path). Optional: title (if omitted, keeps existing title).
     """
     token = _API_TOKEN or os.environ.get("CONFLUENCE_API_TOKEN")
@@ -147,7 +183,7 @@ async def update_confluence_article(
             "title": new_title,
             "space": {"key": space_key},
             "body": {
-                "storage": {
+                "wiki": {
                     "value": body_value,
                     "representation": "wiki",
                 }
@@ -174,10 +210,74 @@ async def update_confluence_article(
     return msg
 
 
-async def get_confluence_page(page_id: str) -> str:
-    """Fetch a Confluence page by ID and return its content.
+async def get_confluence_child_pages(page_id: str) -> str:
+    """List the direct child pages of a Confluence page by ID.
 
-    Returns the page title, view URL, version, and body content (storage format).
+    Returns a list of child pages with their IDs, titles, and view URLs.
+    Uses CONFLUENCE_BASE_URL and CONFLUENCE_API_TOKEN from environment.
+    Required: page_id (Confluence page ID, e.g. "123456789").
+    """
+    token = _API_TOKEN or os.environ.get("CONFLUENCE_API_TOKEN")
+    if not token:
+        raise ValueError(
+            "CONFLUENCE_API_TOKEN is not set. Set it in the environment or in .env."
+        )
+
+    headers = {
+        "Accept": "application/json",
+        "Authorization": f"Bearer {token}",
+    }
+
+    children: list[dict[str, Any]] = []
+    start = 0
+    limit = 50
+
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        while True:
+            resp = await client.get(
+                f"{_BASE_URL}/rest/api/content/{page_id}/child/page",
+                params={"expand": "_links", "start": start, "limit": limit},
+                headers=headers,
+            )
+            text = resp.text
+            if not resp.is_success:
+                err_msg = f"Confluence GET {resp.status_code} {resp.reason_phrase}: {text}"
+                raise RuntimeError(err_msg)
+
+            data = json.loads(text) if text else {}
+            results = data.get("results", [])
+            children.extend(results)
+
+            size = data.get("size", 0)
+            if start + size >= data.get("_links", {}) and len(results) < limit:
+                break
+            if len(results) < limit:
+                break
+            start += limit
+
+    if not children:
+        return f"Page {page_id} has no child pages."
+
+    lines = [f"Child pages of {page_id} ({len(children)} total):"]
+    for child in children:
+        child_id = child.get("id", "?")
+        child_title = child.get("title", "(untitled)")
+        view_url = _build_view_url(child) if child.get("id") else ""
+        entry = f"  - [{child_title}] ID: {child_id}"
+        if view_url:
+            entry += f" | {view_url}"
+        lines.append(entry)
+
+    return "\n".join(lines)
+
+
+async def get_confluence_page(page_id: str) -> str:
+    """Fetch a Confluence page by ID and return its content in Confluence storage format (XHTML).
+
+    Returns the page title, view URL, version, and body in storage format (Confluence's
+    internal XHTML representation). NOTE: the body is NOT wiki markup — it is storage-format
+    XHTML. Do NOT pass this content directly to update_confluence_article; instead convert
+    it to Confluence wiki markup before writing to a .wiki file.
     Uses CONFLUENCE_BASE_URL and CONFLUENCE_API_TOKEN from environment.
     Required: page_id (Confluence page ID, e.g. "123456789").
     """
@@ -214,7 +314,7 @@ async def get_confluence_page(page_id: str) -> str:
         f"Title: {title}",
         f"Page ID: {page.get('id', page_id)}",
         f"Version: {version_num}",
-        f"Representation: {representation}",
+        f"Representation: {representation} (storage/XHTML — not wiki markup)",
     ]
     if view_url:
         lines.append(f"View URL: {view_url}")
@@ -226,4 +326,4 @@ async def get_confluence_page(page_id: str) -> str:
 
 
 # List of tools to register with FastMCP (add_tool(tool) for each)
-tools = [create_confluence_article, update_confluence_article, get_confluence_page]
+tools = [create_confluence_article, update_confluence_article, get_confluence_page, get_confluence_child_pages]

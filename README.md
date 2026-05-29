@@ -1,77 +1,107 @@
-# Wiki MCP
+# Wiki MCP Server
 
-MCP server that creates Confluence articles via the Confluence REST API v1 (e.g. wiki.corp.adobe.com). Based on `create-confluence-article.js`.
+MCP server to **create**, **read**, and **update** Confluence pages. Targets Confluence REST API v1 (e.g. `wiki.corp.adobe.com`).
 
-## Setup
+---
 
-```bash
-uv sync
-```
+## Tools
 
-Create a `.env` in the project root (or set env vars):
+| Tool | Description |
+|------|-------------|
+| `create_confluence_article` | Create a new page. Required: `title`, `body_file` (absolute path to a `.wiki` file). Optional: `space_key` (default `~kavingas`), `parent_id`. |
+| `get_confluence_page` | Fetch a page by ID. Returns title, version, view URL, and body content. Required: `page_id`. |
+| `update_confluence_article` | Update an existing page. Required: `page_id`, `body_file` (absolute path to a `.wiki` file). Optional: `title` (if omitted, keeps existing title). |
 
-```env
-CONFLUENCE_BASE_URL=https://wiki.corp.adobe.com
-CONFLUENCE_API_TOKEN=your-api-token
-```
+**Note for LLMs:** All body content must be in [Confluence wiki markup](https://confluence.atlassian.com/doc/confluence-wiki-markup-251003035.html) — not HTML, not Markdown. Write the markup to a `.wiki` file and pass its absolute path. Examples: `# Heading` → `h1. Heading`; `**bold**` → `*bold*`; `- item` → `* item`; `[text](url)` → `[text|url]`.
 
-Optional: `CONFLUENCE_SPACE_KEY` can be set as a default but is usually passed per tool call.
+---
 
-## Run the server
+## Installation Instructions
 
-Stdio (for Cursor / MCP clients):
+### Requirements
 
-```bash
-uv run python main.py
-```
+- Python 3.12+
+- [uv](https://docs.astral.sh/uv/) (recommended) or pip
+- A Confluence API token (Personal Access Token)
 
-Or with the MCP CLI:
+### Authentication
 
-```bash
-uv run mcp run main.py
-```
+Generate a token from your Confluence instance profile page and set it via environment variable.
 
-## Cursor MCP config
+### Environment Variables
 
-Add to **Cursor Settings → MCP** or to `~/.cursor/mcp.json`:
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `CONFLUENCE_BASE_URL` | No | Confluence base URL (default: `https://wiki.corp.adobe.com`) |
+| `CONFLUENCE_API_TOKEN` | Yes | Bearer token for Confluence REST API auth |
+| `CONFLUENCE_SPACE_KEY` | No | Default space key — can also be passed per tool call |
+
+### Install (recommended via `uvx`)
+
+Add to your MCP config — no separate install step needed.
 
 ```json
 {
   "mcpServers": {
     "wiki": {
-      "command": "uv",
-      "args": ["run", "python", "/Users/kavingas/VSCodeProjects/wiki-mcp/main.py"],
+      "command": "uvx",
+      "args": [
+        "--index", "https://sauronai.adobe.io/pypi/simple/",
+        "wiki-mcp"
+      ],
       "env": {
         "CONFLUENCE_BASE_URL": "https://wiki.corp.adobe.com",
-        "CONFLUENCE_API_TOKEN": "<your-token>"
+        "CONFLUENCE_API_TOKEN": "YOUR_TOKEN_HERE"
       }
     }
   }
 }
 ```
 
-Use your actual project path and token. You can omit `env` if you use a `.env` file in the project directory.
+Or install explicitly with uv:
 
-## Tools
+```bash
+uv pip install --index https://sauronai.adobe.io/pypi/simple/ wiki-mcp
+```
 
-### create_confluence_article
+### Claude Code Setup
 
-Creates a Confluence page from a **.wiki file** (Confluence wiki markup only; not HTML, not raw Markdown).
+One-time CLI registration:
 
-**For LLMs:** If the user provides Markdown, convert it to [Confluence wiki markup](https://confluence.atlassian.com/doc/confluence-wiki-markup-251003035.html) and write it to a `.wiki` file, then pass that file path. Examples: `# Heading` → `h1. Heading`; `**bold**` → `*bold*`; `- item` → `* item`; `[text](url)` → `[text|url]`.
+```bash
+claude mcp add wiki \
+  --env CONFLUENCE_BASE_URL=https://wiki.corp.adobe.com \
+  --env CONFLUENCE_API_TOKEN=YOUR_TOKEN_HERE \
+  -- uvx --index https://sauronai.adobe.io/pypi/simple/ wiki-mcp
+```
 
-| Argument     | Required | Description |
-|--------------|----------|-------------|
-| `title`      | Yes      | Page title |
-| `body_file`  | Yes      | **Absolute path** to a **.wiki** file containing Confluence wiki markup |
-| `space_key`  | No       | Space key (default: ~kavingas) |
-| `parent_id`  | No       | Parent page ID |
+Or add manually to `~/.claude/settings.json` or project `.claude/settings.json`.
 
-## Relation to create-confluence-article.js
+### Cursor Setup
 
-This MCP exposes the same Confluence REST API v1 flow as the Node script:
+Edit `~/.cursor/mcp.json` (global) or `.cursor/mcp.json` (project-level) with the JSON block above, then restart Cursor.
 
-- `POST /rest/api/content` with Bearer token
-- Same payload shape: `type`, `title`, `space`, `body.storage`, optional `ancestors`
+### Codex CLI Setup
 
-Use the MCP from Cursor to create pages via the AI; use the JS script for one-off CLI runs.
+Edit `~/.codex/config.yaml`:
+
+```yaml
+mcpServers:
+  wiki:
+    type: stdio
+    command: uvx
+    args:
+      - --index
+      - https://sauronai.adobe.io/pypi/simple/
+      - wiki-mcp
+    env:
+      CONFLUENCE_BASE_URL: "https://wiki.corp.adobe.com"
+      CONFLUENCE_API_TOKEN: "YOUR_TOKEN_HERE"
+```
+
+### Local Development
+
+```bash
+uv sync
+uv run main.py
+```

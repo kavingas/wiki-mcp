@@ -1,6 +1,16 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project.scripts]
+wiki-mcp = "main:main"
+
+[tool.setuptools]
+py-modules = ["main", "wiki_tools", "wiki_mcp_prompts"]
+
 [project]
 name = "wiki-mcp"
-version = "0.1.0"
+version = "0.1.6"
 description = "Wiki MCP: create and manage Confluence pages via REST API v1"
 readme = "README.md"
 requires-python = ">=3.12"

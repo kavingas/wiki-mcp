@@ -11,6 +11,7 @@ Environment (or .env):
 from dotenv import load_dotenv
 from mcp.server.fastmcp import FastMCP
 
+from wiki_mcp_prompts import register_prompts
 from wiki_tools import tools
 
 load_dotenv(override=True)
@@ -22,6 +23,7 @@ mcp = FastMCP("wiki-mcp")
 def main() -> None:
     for tool in tools:
         mcp.add_tool(tool)
+    register_prompts(mcp._mcp_server)
     mcp.run(transport="stdio")
 
 
